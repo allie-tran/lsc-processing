@@ -1,0 +1,27 @@
+**/__pycache__/*
+**/.ipynb_checkpoints/*
+LSC21/*
+VAISL/*.ipynb
+VAISL/files_backup/
+VAISL/wrong/
+clip_derive_embeddings.py
+clip_evaluate/*
+files/*
+filter_for_Cathal/*
+mongod.log
+order.txt
+photo_attributes.csv
+segmentation/add_extra_removal.py
+segmentation/cluster.py
+segmentation/extract_sift.py
+segmentation/inspect_no_sift.py
+segmentation/no_sift/
+segmentation/similar.ipynb
+segmentation/similar_images.py
+segmentation/skipped.json
+segmentation/to_remove.txt
+segmentation/train_classifier.py
+temp/
+Day Embeddings Visualisation.ipynb
+GPS_address.ipynb
+VAISL/iou.csv
