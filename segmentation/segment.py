@@ -25,8 +25,9 @@ photo_ids = None
 if __name__ == "__main__":
     last_feat = np.zeros(768)
     last_location = "NONE"
+    last_location_info = ""
 
-    groups = defaultdict(lambda: {"scenes": [], "location": ""})
+    groups = defaultdict(lambda: {"scenes": [], "location": "", "location_info": ""})
     num_group = 0
     num_scene = 0
     images = []
@@ -38,7 +39,8 @@ if __name__ == "__main__":
                     feat = clip_embeddings[key]
                 else:
                     feat = np.zeros(768)
-                location = row["new_name"]
+                location = row["checkin"]
+                location_info = row["categories"] if row["stop"] else row["checkin"]
                 # Different group
                 if location != last_location or len(groups[f"G_{num_group}"]["scenes"]) >= 99:
                     if images:
@@ -47,8 +49,10 @@ if __name__ == "__main__":
                         images = []
                     if groups[f"G_{num_group}"]["scenes"]:
                         groups[f"G_{num_group}"]["location"] = last_location
+                        groups[f"G_{num_group}"]["location_info"] = location_info
                         num_group += 1
                     last_location = location
+                    last_location_info = location_info
 
                 else: # Might be same scene or different scene
                     new_scene = cdist([last_feat], [feat], 'cosine')[0]

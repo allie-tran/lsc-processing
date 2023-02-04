@@ -34,6 +34,31 @@ def cache(_func=None, *, file_name=None, separator='_'):
     else:
         return decorator(_func)
 
+from googletrans import Translator, constants
+from langdetect import detect
+# %%
+# Translating
+translator = Translator()
+text_exceptions={"Adapt Centre @ Dcu": "Adapt Centre @ Dcu",
+                "777": "777",
+                "Nip@tuck": "Nip@tuck"}
+def to_english(text, debug=False):
+    if text:
+        if text in text_exceptions:
+            return text_exceptions[text]
+        try:
+            lang = detect(text)
+            if lang != "en":
+                text = translator.translate(text).text
+            return unidecode(text)
+        except Exception as e:
+            if debug:
+                print(f"Error translating \"{text}\"")
+                raise(e)
+            else:
+                pass
+    return text
+
 def smooth(series, window_size=3):
     smoothed_series = []
     appended_series = list(series)

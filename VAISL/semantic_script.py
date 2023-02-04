@@ -11,8 +11,6 @@ from vision_utils import *
 from datetime import datetime, timezone, timedelta
 # Language libraries
 from unidecode import unidecode
-from googletrans import Translator, constants
-from langdetect import detect
 import re
 
 # %% [markdown]
@@ -21,7 +19,7 @@ import re
 # %%
 checkin_file = '../../original_data/checkins.json'
 stop_file = 'files/stops.csv'
-
+DISTANCE_THRESHOLD = 100
 # %%
 stops = pd.read_csv(stop_file, sep=',', decimal='.')
 # Leave out stops without images
@@ -36,9 +34,9 @@ ZEROS = [0 for i in range(len(stops))]
 FALSES = [False for i in range(len(stops))]
 
 stops = stops.assign(checkin=EMPTY_STRINGS,
-                     original_name=EMPTY_STRINGS,
+                     checkin_id=EMPTY_STRINGS,
                      in_checkin=FALSES,
-                     place_id=EMPTY_STRINGS,
+                     original_name=EMPTY_STRINGS,
                      categories=EMPTY_STRINGS,
                      prob=ZEROS,
                      parent=EMPTY_STRINGS,
@@ -96,28 +94,7 @@ for checkin in tqdm(named_checkins):
 # %% [markdown]
 # ## Various checkin functions
 
-# %%
-# Translating
-translator = Translator()
-text_exceptions={"Adapt Centre @ Dcu": "Adapt Centre @ Dcu",
-                "777": "777",
-                "Nip@tuck": "Nip@tuck"}
-def to_english(text, debug=False):
-    if text:
-        if text in text_exceptions:
-            return text_exceptions[text]
-        try:
-            lang = detect(text)
-            if lang != "en":
-                text = translator.translate(text).text
-            return unidecode(text)
-        except Exception as e:
-            if debug:
-                print(f"Error translating \"{text}\"")
-                raise(e)
-            else:
-                pass
-    return text
+
 
 # %% [markdown]
 # ## Assign checkins
@@ -222,7 +199,7 @@ def get_nearby_checkins(start, end, lat=None, lon=None, max_radius=500, time_lim
     for i in range(start_ind, end_ind+1):
         checkin = named_checkins[i]
         if lat:
-            if distance(lat, lon, checkin["latitude"], checkin["longitude"]) > max(500, max_radius):
+            if distance(lat, lon, checkin["latitude"], checkin["longitude"]) > max(DISTANCE_THRESHOLD * 4, max_radius):
                 continue
         base_checkins.append(checkin)
         gaps.append(checkin_times[i] - start)
@@ -262,7 +239,7 @@ def find_named_checkins_nearby(images, image_features, stop, lat, lon, max_radiu
             print([(checkin["name"], checkin["distance"]) for checkin in nearbys])
             print("Max radius:", max_radius)
         # Filter nearbys by distance
-        nearbys = [checkin for checkin in nearbys if "distance" not in checkin or checkin["distance"] < max(400, max_radius)]
+        nearbys = [checkin for checkin in nearbys if "distance" not in checkin or checkin["distance"] < max(DISTANCE_THRESHOLD * 4, max_radius)]
 
         if not nearbys:
             if logging:
@@ -352,6 +329,14 @@ def find_named_checkins_nearby(images, image_features, stop, lat, lon, max_radiu
     return NULL_CHECKIN, 0, False
 
 # %%
+all_checkins = {}
+@cache(file_name="cached/checkins")
+def save_checkin(checkin):
+    global all_checkins
+    if checkin["place_id"] not in all_checkins:
+        all_checkins[checkin["place_id"]] = checkin
+    
+# %%
 def get_checkin(row, logging=False):
     stop = stops.loc[row, "stop"]
     lat = stops.loc[row, "lat"]
@@ -383,26 +368,30 @@ def get_checkin(row, logging=False):
 #         stops.loc[row, "stop"] = stop
         if stop:
             if not np.isnan(lat):
-                if distance(lat, lon, 53.38998, -6.1457602) < 100:
+                if distance(lat, lon, 53.38998, -6.1457602) < DISTANCE_THRESHOLD:
                     stops.loc[row, "checkin"] = "HOME"
-                elif distance(lat, lon, 53.386859863999995, -6.147444621999999) < 100:
+                elif distance(lat, lon, 53.386859863999995, -6.147444621999999) < DISTANCE_THRESHOLD:
                     stops.loc[row, "checkin"] = "Charm Hand & Foot Spa"
                 # elif movement_prob > 0.7 and movement in ["Private Home"]:
                 #     stops.loc[row, "checkin"] = "Private Home"
                 else:
                     checkin, prob, in_checkin = find_named_checkins_nearby(images, image_features, stop, lat, lon, max_radius, logging=logging)
+                    save_checkin(checkin)
                     stops.loc[row, "checkin"] = checkin["name"]
+                    stops.loc[row, "checkin_id"] = checkin["place_id"]
                     stops.loc[row, "original_name"] = checkin["name"]
-                    stops.loc[row, "parent"] = checkin["parent"]
-                    stops.loc[row, "parent_id"] = checkin["parent_id"]
+                    stops.loc[row, "in_checkin"] = in_checkin
                     stops.loc[row, "categories"] = ", ".join(checkin["categories"])
                     stops.loc[row, "prob"] = prob
-                    stops.loc[row, "in_checkin"] = in_checkin
+                    stops.loc[row, "parent"] = checkin["parent"]
+                    stops.loc[row, "parent_id"] = checkin["parent_id"]
             else:
                 stops.loc[row, "checkin"] = "Unknown Place"
         # else:
         #     stops.loc[row, "movement"] = movement
         #     stops.loc[row, "movement_prob"] = movement_prob
+        if "20200109_133958_000.jpg" in images:
+            print(stops.loc[row, "checkin"])
 
 # %% [markdown]
 # ## Start
@@ -414,7 +403,7 @@ MODES = ["REL"]
 num = len(stops)
 print("Total stops:", len(stops))
 num_start = 0
-num_end = num
+num_end = len(stops)
 print("Processing from:", num_start, "to", num_end)
 for i in tqdm(range(num_start, num_end), desc="Get Checkins"):
     get_checkin(i)
@@ -438,42 +427,21 @@ def calculate_distance(checkin, all_lat, all_lon, lat, lon):
         if dists:
             return max(dists)
     return 50
-
+tqdm.pandas(desc="Getting radius of stops")
 stops["max_radius"] = stops.progress_apply(lambda x: calculate_distance(x['checkin'], x['all_lat'],
                                                                x['all_lon'],
                                                                x['lat'],
                                                                x['lon']), axis=1)
 # %%
+print("Numbers of Unknown Places", sum(stops['checkin'] == 'Unknown Place'))
 for i, checkin in tqdm(enumerate(stops['checkin']), total=len(stops), desc="Processing Unknown Places"):
     if checkin == "Unknown Place":
         get_checkin(i)
 
 # %%
 stops = agg_stops.agg_stop(stops)
-
+tqdm.pandas(desc="Getting country for stops")
+stops['country'] = stops.progress_apply(lambda x: get_countries(round(x['lat'], 3), round(x['lon'], 3)), axis=1)
 # %%
+json.dump(all_checkins, open("files/all_checkins.json", "w"), default=str)
 stops.to_csv("files/semantic_stops.csv")
-
-# %%
-# FOR MYSCEAL
-map_visualisation = []
-
-for index, row in stops.iterrows():
-    map_visualisation.append((unidecode(row["checkin"]), (row["lat"], row["lon"])))
-
-json.dump(map_visualisation, open(f"files/map_visualisation.json", 'w'))
-with open(f"files/commonplace.js", 'w') as f:
-    f.write("var commonPlace=" + json.dumps(map_visualisation) + ";\n\nexport default commonPlace;")
-
-# %%
-both = agg_stops.assign_to_images(stops)
-both['city'] = both.progress_apply(lambda x: get_cities(round(x['new_lat'], 3), round(x['new_long'], 3)), axis=1)
-both['country'] = both.progress_apply(lambda x: get_countries(round(x['new_lat'], 3), round(x['new_long'], 3)), axis=1)
-
-from tzwhere import tzwhere
-tz = tzwhere.tzwhere(forceTZ=True)        
-both["new_timezone"] = both.progress_apply(lambda x: tz.tzNameAt(round(x['new_lat'], 4), 
-                                                                 round(x['new_long'], 4), 
-                                                                 forceTZ=True), axis=1)
-
-both.to_csv('files/final_metadata.csv')

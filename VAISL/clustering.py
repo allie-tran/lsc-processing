@@ -89,8 +89,8 @@ gps = gps.assign(stop=stop_values,
 
 # %%
 # Smooth stop/move label
-gps["stop"] = smooth(gps["stop"])
-gps["cluster_label"] = smooth(gps["cluster_label"])
+# gps["stop"] = smooth(gps["stop"])
+# gps["cluster_label"] = smooth(gps["cluster_label"])
 gps["stop_label"] = gps.progress_apply(lambda x: x['cluster_label'] if x['stop'] else "", axis=1)
 
 # %% [markdown]
@@ -138,6 +138,13 @@ theta = 0.9
 both.loc[(both["inside"] == False) & (both["movement_prob"] > theta), 'stop'] = False
 both.loc[(both["inside"] == False) & (both["movement_prob"] > theta), 'stop_label'] = ""
 
+both.loc[both["Tags"].str.contains('outdoor', na=False, ), 'inside'] = False
+both.loc[both["Tags"].str.contains('outdoor', na=False), 'stop'] = False
+both.loc[both["Tags"].str.contains('outdoor', na=False), 'stop_label'] = ""
+
+both["stop"] = smooth(both["stop"])
+both["cluster_label"] = smooth(both["cluster_label"])
+both["stop_label"] = both.progress_apply(lambda x: x['cluster_label'] if x['stop'] else "", axis=1)
 
 # %% [markdown]
 # ## Remove short stops
@@ -172,17 +179,15 @@ cluster_label_values = [""] * len(both)
 boundaries = [None] * len(both)
 
 for i, row in tqdm(stops.iterrows(), total=len(stops), desc='adjusting boundaries'):
+    start = row["images"][0]
+    start = all_image_ids.index(start)
+    end = row["images"][-1]
+    end = all_image_ids.index(end)
+    stop_values[start:end+1] = [row["stop"] for i in range(start, end +1)]
     if row["stop"]:
-        start = row["images"][0]
-        boundaries[all_image_ids.index(start)] = "start"
-        end = row["images"][-1]
-        boundaries[all_image_ids.index(end)] = "end"
-
-    for image in row["images"]:
-        image_id = all_image_ids.index(image)
-        stop_values[image_id] = row["stop"]
-        if row["stop"]:
-            cluster_label_values[image_id] = row["stop_label"]
+        boundaries[start] = "start"
+        boundaries[end] = "end"
+        cluster_label_values[start:end+1] = [row["stop_label"] for i in range(start, end +1)]
 
 both = both.assign(stop=stop_values,
                    stop_label=cluster_label_values,
@@ -256,6 +261,7 @@ stops = both.groupby(((both['stop_label'].shift() != both['stop_label'])).cumsum
 stops = stops.reset_index()
 stops = stops.drop(columns=['stop_label'])
 stops = stops.rename(columns={'stop_label2': 'stop_label'})
+stops.loc[stops['duration'] < 3, 'stop'] = False
 
 # %%
 def calculate_distance(all_lat, all_lon, lat, lon):
