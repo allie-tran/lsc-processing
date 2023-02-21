@@ -14,7 +14,7 @@ info_dict = json.load(open("files/info_dict.json"))
 # Set up ElasticSearch
 
 es = Elasticsearch([{"host": "localhost", "port": 9200}])
-interest_index = "lsc2022_test"
+interest_index = "lsc2023"
 # clip_embeddings = joblib.load(
     # "/mnt/data/nvtu/embedding_features/L14_336_features_128.pkl")
 photo_features = np.load("files/embeddings/features.npy")
@@ -23,99 +23,101 @@ clip_embeddings = {photo_id: photo_feature for photo_id, photo_feature in zip(ph
 photo_features = None
 photo_ids = None
 
-try:
-    print("Deleting index: " + interest_index)
-    es.indices.delete(index=interest_index)
-except BaseException as e:
-    print("Do not have index to delete: " + interest_index)
+if es.indices.exists(index=interest_index):
+    to_delete = input(
+        f"Do you want to delete existing index: {interest_index}? (Y/N) ")
+    if to_delete == "Y":
+        print("Deleting index: " + interest_index)
+        es.indices.delete(index=interest_index)
 
-es.indices.create(
-    index=interest_index,
-    body={
-        "settings": {
-            "number_of_shards": 8,
-            "elastiknn": True,               # 2
-            "number_of_replicas": 0,
-            "sort.field": ["timestamp"],
-            "sort.order": ["asc"]
-        },
-        "mappings": {
-            "properties": {
-                "image_path": {
-                    "type": "keyword"
-                },
-                "descriptions": {
-                    "type": "keyword", "similarity": "boolean"
-                },
-                "weekday": {
-                    "type": "keyword", "similarity": "boolean"
-                },
-                "date": {
-                    "type": "keyword", "similarity": "boolean"
-                },
-                "month": {
-                    "type": "keyword", "similarity": "boolean"
-                },
-                "year": {
-                    "type": "keyword", "similarity": "boolean"
-                },
-                "hour": {
-                    "type": "byte"
-                },
-                "minute": {
-                    "type": "byte"
-                },
-                "location": {
-                    "type": "text"
-                },
-                "address": {
-                    "type": "text"
-                },
-                "time": {
-                    "type": "date",
-                    "format": "yyyy/MM/dd HH:mm:00Z"
-                },
-                "utc_time": {
-                    "type": "date",
-                    "format": "yyyy/MM/dd HH:mm:00Z"
-                },
-                "gps": {
-                    "type": "geo_point"
-                },
-                "region": {
-                    "type": "keyword", "similarity": "boolean"
-                },
-                "group": {"type": "keyword"},
-                "scene": {"type": "keyword"},
-                "timestamp": {"type": "long"},
-                "before": {"type": "keyword"},
-                "after": {"type": "keyword"},
-                "ocr": {"type": "text"},
-                "ocr_score": {
-                    "type": "rank_features"
-                },
-                # "similar_vector": {
-                #     "type": "elastiknn_dense_float_vector",
-                #     "elastiknn": {                            # 4
-                #         "dims": 4608,                            # 5
-                #         "model": "permutation_lsh",         # 3
-                #         "k": 200,                            # 4
-                #         "repeating": False                   # 5
-                #     }
-                # },
-                "clip_vector": {
-                    "type": "elastiknn_dense_float_vector",
-                    "elastiknn": {
-                        "dims": 768,
-                        "model": "permutation_lsh",         # 3
-                        "k": 400,                            # 4
-                        "repeating": True                   # 5
+if not es.indices.exists(index=interest_index):
+    es.indices.create(
+        index=interest_index,
+        **{
+            "settings": {
+                "number_of_shards": 8,
+                "elastiknn": True,               # 2
+                "number_of_replicas": 0,
+                "sort.field": ["timestamp"],
+                "sort.order": ["asc"]
+            },
+            "mappings": {
+                "properties": {
+                    "image_path": {
+                        "type": "keyword"
+                    },
+                    "descriptions": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
+                    "weekday": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
+                    "date": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
+                    "month": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
+                    "year": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
+                    "hour": {
+                        "type": "byte"
+                    },
+                    "minute": {
+                        "type": "byte"
+                    },
+                    "location": {
+                        "type": "text"
+                    },
+                    "address": {
+                        "type": "text"
+                    },
+                    "time": {
+                        "type": "date",
+                        "format": "yyyy/MM/dd HH:mm:00Z"
+                    },
+                    "utc_time": {
+                        "type": "date",
+                        "format": "yyyy/MM/dd HH:mm:00Z"
+                    },
+                    "gps": {
+                        "type": "geo_point"
+                    },
+                    "region": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
+                    "group": {"type": "keyword"},
+                    "scene": {"type": "keyword"},
+                    "timestamp": {"type": "long"},
+                    "before": {"type": "keyword"},
+                    "after": {"type": "keyword"},
+                    "ocr": {"type": "text"},
+                    "ocr_score": {
+                        "type": "rank_features"
+                    },
+                    # "similar_vector": {
+                    #     "type": "elastiknn_dense_float_vector",
+                    #     "elastiknn": {                            # 4
+                    #         "dims": 4608,                            # 5
+                    #         "model": "permutation_lsh",         # 3
+                    #         "k": 200,                            # 4
+                    #         "repeating": False                   # 5
+                    #     }
+                    # },
+                    "clip_vector": {
+                        "type": "elastiknn_dense_float_vector",
+                        "elastiknn": {
+                            "dims": 768,
+                            "model": "permutation_lsh",         # 3
+                            "k": 400,                            # 4
+                            "repeating": True                   # 5
+                        }
                     }
                 }
             }
         }
-    }
-)
+    )
 
 # images = json.load(open("files/full_similar_images.json"))
 # features = joblib.load("/mnt/data/duyen/sift_and_vgg.feature")
@@ -127,9 +129,8 @@ def index(items):
     requests = []
     no_clip = 0
     for (image, desc) in tqdm(items):
-        if es.exists(interest_index, image):
+        if es.exists(index=interest_index, id=image):
             continue
-
         if image in clip_embeddings:
             desc["clip_vector"] = clip_embeddings[image]
         else:

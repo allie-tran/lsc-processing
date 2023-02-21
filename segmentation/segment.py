@@ -14,6 +14,7 @@ from pprint import pprint
 from datetime import datetime
 
 metadata = pd.read_csv('../VAISL/files/final_metadata.csv', sep=',', decimal='.')
+metadata['checkin'] = metadata['checkin'].fillna("")
 unhelpful_images = json.load(open("../files/unhelpful_images.json"))
 photo_features = np.load("../files/embeddings/features.npy")
 photo_ids = list(pd.read_csv("../files/embeddings/photo_ids.csv")["photo_id"])
@@ -21,10 +22,20 @@ clip_embeddings = {photo_id: photo_feature for photo_id,
                    photo_feature in zip(photo_ids, photo_features)}
 photo_features = None
 photo_ids = None
+THRESHOLD = 0.3
+
+def is_new_group(location, last_location, location_info, last_location_info, scenes):
+    if last_location != location:
+        return True
+    if last_location_info != location_info:
+        return True
+    if location == "NONE":
+        return len(scenes) > 99
+    return False    
 
 if __name__ == "__main__":
     last_feat = np.zeros(768)
-    last_location = "NONE"
+    last_location = "HOME"
     last_location_info = ""
 
     groups = defaultdict(lambda: {"scenes": [], "location": "", "location_info": ""})
@@ -35,14 +46,17 @@ if __name__ == "__main__":
         if isinstance(row['ImageID'], str):
             if row['ImageID'] not in unhelpful_images:
                 key = f"{row['ImageID'][:6]}/{row['ImageID'][6:8]}/{row['ImageID']}"
+                
                 if key in clip_embeddings:
                     feat = clip_embeddings[key]
                 else:
                     feat = np.zeros(768)
-                location = row["checkin"]
+                location = row["checkin"] if row["stop"] else "NONE"
                 location_info = row["categories"] if row["stop"] else row["checkin"]
+                if str(location_info) == "nan":
+                    location_info = ""
                 # Different group
-                if location != last_location or len(groups[f"G_{num_group}"]["scenes"]) >= 99:
+                if is_new_group(location, last_location, location_info, last_location_info, groups[f"G_{num_group}"]["scenes"]):
                     if images:
                         num_scene += 1
                         groups[f"G_{num_group}"]["scenes"].append((f"S_{num_scene}", images))
@@ -56,7 +70,7 @@ if __name__ == "__main__":
 
                 else: # Might be same scene or different scene
                     new_scene = cdist([last_feat], [feat], 'cosine')[0]
-                    if new_scene > 0.2: # Different scene
+                    if new_scene > THRESHOLD: #Different scene
                         if images:
                             num_scene += 1
                             groups[f"G_{num_group}"]["scenes"].append((f"S_{num_scene}", images))
@@ -67,4 +81,4 @@ if __name__ == "__main__":
         num_scene += 1
         groups[f"G_{num_group}"]["scenes"].append((f"S_{num_scene}", images))
 
-    json.dump(groups, open("../files/group_segments.json", "w"))
+    # json.dump(groups, open("../files/group_segments.json", "w"))
