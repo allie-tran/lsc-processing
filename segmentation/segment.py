@@ -16,13 +16,14 @@ from datetime import datetime
 metadata = pd.read_csv('../VAISL/files/final_metadata.csv', sep=',', decimal='.')
 metadata['checkin'] = metadata['checkin'].fillna("")
 unhelpful_images = json.load(open("../files/unhelpful_images.json"))
-photo_features = np.load("../files/embeddings/features.npy")
-photo_ids = list(pd.read_csv("../files/embeddings/photo_ids.csv")["photo_id"])
+CLIP_EMBEDDINGS = os.environ.get("CLIP_EMBEDDINGS")
+photo_features = np.load(f"{CLIP_EMBEDDINGS}/features.npy")
+photo_ids = list(pd.read_csv(f"{CLIP_EMBEDDINGS}/photo_ids.csv")["photo_id"])
 clip_embeddings = {photo_id: photo_feature for photo_id,
                    photo_feature in zip(photo_ids, photo_features)}
 photo_features = None
 photo_ids = None
-THRESHOLD = 0.3
+THRESHOLD = 0.01
 
 def is_new_group(location, last_location, location_info, last_location_info, scenes):
     if last_location != location:
@@ -42,7 +43,8 @@ if __name__ == "__main__":
     num_group = 0
     num_scene = 0
     images = []
-    for index, row in tqdm(metadata.iterrows(), total=len(metadata)):
+    pbar = tqdm(metadata.iterrows(), total=len(metadata))
+    for index, row in pbar:
         if isinstance(row['ImageID'], str):
             if row['ImageID'] not in unhelpful_images:
                 key = f"{row['ImageID'][:6]}/{row['ImageID'][6:8]}/{row['ImageID']}"
@@ -63,7 +65,7 @@ if __name__ == "__main__":
                         images = []
                     if groups[f"G_{num_group}"]["scenes"]:
                         groups[f"G_{num_group}"]["location"] = last_location
-                        groups[f"G_{num_group}"]["location_info"] = location_info
+                        groups[f"G_{num_group}"]["location_info"] = last_location_info
                         num_group += 1
                     last_location = location
                     last_location_info = location_info
@@ -77,8 +79,10 @@ if __name__ == "__main__":
                             images = []
                 images.append(key)
                 last_feat = feat
+        pbar.set_description(f"Scenes: {num_scene}, Groups: {num_group}")
     if images:
         num_scene += 1
         groups[f"G_{num_group}"]["scenes"].append((f"S_{num_scene}", images))
-
-    # json.dump(groups, open("../files/group_segments.json", "w"))
+    print("Number of groups:", num_group)
+    print("Number of scenes:", num_scene)
+    json.dump(groups, open("../files/group_segments.json", "w"))

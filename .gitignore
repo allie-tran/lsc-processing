@@ -4,7 +4,6 @@ LSC21/*
 VAISL/*.ipynb
 VAISL/files_backup/
 VAISL/wrong/
-clip_derive_embeddings.py
 clip_evaluate/*
 files/*
 filter_for_Cathal/*
