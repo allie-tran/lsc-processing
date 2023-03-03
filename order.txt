@@ -1,0 +1,21 @@
+1. GPS
+GPS_cluster.ipynb -> processed.csv, map_visualisation.json
+
+2. Segmentation
+extract_sift -> sift_feat folders (can delete after clustering)
+inspect_no_sift -> unhelpful_images.json
+cluster.py -> sift_kmeans.storage
+train_classifier.py -> segmenter.joblib
+***extract VGG feat***
+segment.py -> group_segments.json
+
+4. Clip embeddings
+clip_derive_embeddings.py
+
+5. Create Info Dict
+***extract OCR bounding box***
+create_info_dict.ipynb
+
+6. Index
+index_es.py
+similar_images.py

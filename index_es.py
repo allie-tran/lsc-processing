@@ -117,13 +117,6 @@ if not es.indices.exists(index=interest_index):
                 }
             }
         }
-    )
-
-# images = json.load(open("files/full_similar_images.json"))
-# features = joblib.load("/mnt/data/duyen/sift_and_vgg.feature")
-# similar_features = {image: photo_feature for image,
-#                  photo_feature in zip(images, features)}
-
 
 def index(items):
     requests = []
