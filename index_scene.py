@@ -59,7 +59,7 @@ if not es.indices.exists(index=interest_index):
                     "weekday": {
                         "type": "keyword", "similarity": "boolean"
                     },
-                    "date": {
+                    "day": {
                         "type": "keyword", "similarity": "boolean"
                     },
                     "month": {
@@ -68,6 +68,13 @@ if not es.indices.exists(index=interest_index):
                     "year": {
                         "type": "keyword", "similarity": "boolean"
                     },
+                    "date": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
+                    "day_month": {"type": "keyword", "similarity": "boolean"
+                    },
+                    "month_year": {"type": "keyword", "similarity": "boolean"},
+                    "day_year": {"type": "keyword", "similarity": "boolean"},
                     "hour": {
                         "type": "byte"
                     },
@@ -76,9 +83,6 @@ if not es.indices.exists(index=interest_index):
                     },
                     "location": {
                         "type": "text"
-                    },
-                    "location": {
-                        "type": "keyword", "similarity": "boolean"
                     },
                     "address": {
                         "type": "text"
@@ -100,6 +104,8 @@ if not es.indices.exists(index=interest_index):
                     "group": {"type": "keyword"},
                     "scene": {"type": "keyword"},
                     "timestamp": {"type": "long"},
+                    "start_seconds_from_midnight": {"type": "long"},
+                    "end_seconds_from_midnight": {"type": "long"},
                     "before": {"type": "keyword"},
                     "after": {"type": "keyword"},
                     "ocr": {"type": "text"},
@@ -195,10 +201,16 @@ def index(items):
                             cluster_images.append([image for (image, label) in zip(
                                 desc["images"], labels) if label==i])
                             scene_embeddings.append(embedding)
+            desc["date"] = desc["start_time"][:10]
             
-            desc["date"] = desc["start_time"][8:10]
+            desc["day"] = desc["start_time"][8:10]
             desc["month"] = desc["start_time"][5:7]
             desc["year"] = desc["start_time"][:4]
+            
+            desc["day_year"] = desc["day"] + "/" + desc["year"]
+            desc["month_year"] = desc["month"] + "/" + desc["year"]
+            desc["day_month"] = desc["day"] + "/" + desc["month"]
+            
             desc["minute"] = int(desc["start_time"][14:16])
             desc["hour"]=int(desc["start_time"][11:13])
             desc["gps"] = []
