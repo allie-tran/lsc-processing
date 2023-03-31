@@ -8,7 +8,6 @@ import os
 import cv2
 import numpy as np
 import pandas as pd
-from extract_sift import *
 import json
 from pprint import pprint
 from datetime import datetime
