@@ -109,7 +109,7 @@ if not es.indices.exists(index=interest_index):
                     "clip_vector": {
                         "type": "elastiknn_dense_float_vector",
                         "elastiknn": {
-                            "dims": 768,
+                            "dims": 1024,
                             "model": "permutation_lsh",         # 3
                             "k": 400,                            # 4
                             "repeating": True                   # 5

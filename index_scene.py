@@ -77,6 +77,9 @@ if not es.indices.exists(index=interest_index):
                     "location": {
                         "type": "text"
                     },
+                    "location": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
                     "address": {
                         "type": "text"
                     },
