@@ -137,18 +137,18 @@ def index(items):
             # continue
 
         # datetime_value = datetime.strptime(desc["time"], "%Y/%m/%d %H:%M:00%z")
-        desc["date"] = desc["start_time"][:10]
+        desc["date"] = desc["time"][:10]
             
-        desc["day"] = desc["start_time"][8:10]
-        desc["month"] = desc["start_time"][5:7]
-        desc["year"] = desc["start_time"][:4]
+        desc["day"] = desc["time"][8:10]
+        desc["month"] = desc["time"][5:7]
+        desc["year"] = desc["time"][:4]
         
         desc["day_year"] = desc["day"] + "/" + desc["year"]
         desc["month_year"] = desc["month"] + "/" + desc["year"]
         desc["day_month"] = desc["day"] + "/" + desc["month"]
         
-        desc["minute"] = int(desc["start_time"][14:16])
-        desc["hour"]=int(desc["start_time"][11:13])
+        desc["minute"] = int(desc["time"][14:16])
+        desc["hour"]=int(desc["time"][11:13])
 
         if sys.getsizeof(requests) + sys.getsizeof(desc) > 15000:
             try:
