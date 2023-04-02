@@ -53,7 +53,7 @@ if not es.indices.exists(index=interest_index):
                     "weekday": {
                         "type": "keyword", "similarity": "boolean"
                     },
-                    "date": {
+                    "day": {
                         "type": "keyword", "similarity": "boolean"
                     },
                     "month": {
@@ -62,6 +62,13 @@ if not es.indices.exists(index=interest_index):
                     "year": {
                         "type": "keyword", "similarity": "boolean"
                     },
+                    "date": {
+                        "type": "keyword", "similarity": "boolean"
+                    },
+                    "day_month": {"type": "keyword", "similarity": "boolean"
+                    },
+                    "month_year": {"type": "keyword", "similarity": "boolean"},
+                    "day_year": {"type": "keyword", "similarity": "boolean"},
                     "hour": {
                         "type": "byte"
                     },
@@ -91,21 +98,13 @@ if not es.indices.exists(index=interest_index):
                     "group": {"type": "keyword"},
                     "scene": {"type": "keyword"},
                     "timestamp": {"type": "long"},
+                    "seconds_from_midnight": {"type": "long"},
                     "before": {"type": "keyword"},
                     "after": {"type": "keyword"},
                     "ocr": {"type": "text"},
                     "ocr_score": {
                         "type": "rank_features"
                     },
-                    # "similar_vector": {
-                    #     "type": "elastiknn_dense_float_vector",
-                    #     "elastiknn": {                            # 4
-                    #         "dims": 4608,                            # 5
-                    #         "model": "permutation_lsh",         # 3
-                    #         "k": 200,                            # 4
-                    #         "repeating": False                   # 5
-                    #     }
-                    # },
                     "clip_vector": {
                         "type": "elastiknn_dense_float_vector",
                         "elastiknn": {
@@ -138,11 +137,18 @@ def index(items):
             # continue
 
         # datetime_value = datetime.strptime(desc["time"], "%Y/%m/%d %H:%M:00%z")
-        desc["date"] = desc["time"][8:10]
-        desc["month"] = desc["time"][5:7]
-        desc["year"] = desc["time"][:4]
-        desc["minute"] = int(desc["time"][14:16])
-        desc["hour"]=int(desc["time"][11:13])
+        desc["date"] = desc["start_time"][:10]
+            
+        desc["day"] = desc["start_time"][8:10]
+        desc["month"] = desc["start_time"][5:7]
+        desc["year"] = desc["start_time"][:4]
+        
+        desc["day_year"] = desc["day"] + "/" + desc["year"]
+        desc["month_year"] = desc["month"] + "/" + desc["year"]
+        desc["day_month"] = desc["day"] + "/" + desc["month"]
+        
+        desc["minute"] = int(desc["start_time"][14:16])
+        desc["hour"]=int(desc["start_time"][11:13])
 
         if sys.getsizeof(requests) + sys.getsizeof(desc) > 15000:
             try:
