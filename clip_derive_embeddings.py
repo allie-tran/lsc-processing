@@ -44,7 +44,7 @@ if __name__ == "__main__":
     photofiles2 = []
     photo_keys = []
     photos_path = '/mnt/DATA/duyen/highres/LSC23/'
-    model_name = "ViT-L/14"
+    model_name = "ViT-L-14-336"
     pretrained = "openai"
     output_path = f'/mnt/DATA/duyen/highres/LSC23/{model_name.replace("/", "-")}_{pretrained}_nonorm'
     batch_size = 48

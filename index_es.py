@@ -15,11 +15,12 @@ info_dict = json.load(open("files/info_dict.json"))
 
 es = Elasticsearch("http://localhost:9200")
 interest_index = "lsc2023"
-# clip_embeddings = joblib.load(
-    # "/mnt/data/nvtu/embedding_features/L14_336_features_128.pkl")
 CLIP_EMBEDDINGS = os.environ.get("CLIP_EMBEDDINGS")
-photo_features = np.load(f"{CLIP_EMBEDDINGS}/ViT-H-14_laion2b_s32b_b79k_nonorm/features.npy")
-photo_ids = list(pd.read_csv(f"{CLIP_EMBEDDINGS}/ViT-H-14_laion2b_s32b_b79k_nonorm/photo_ids.csv")["photo_id"])
+# model = 'ViT-H-14_laion2b_s32b_b79k_nonorm'
+model = 'ViT-L14_openai_nonorm/'
+photo_features = np.load(f"{CLIP_EMBEDDINGS}/{model}/features.npy")
+DIM = photo_features.shape[-1]
+photo_ids = list(pd.read_csv(f"{CLIP_EMBEDDINGS}/{model}/photo_ids.csv")["photo_id"])
 clip_embeddings = {photo_id: photo_feature for photo_id, photo_feature in zip(photo_ids, photo_features)}
 photo_features = None
 photo_ids = None
@@ -108,7 +109,7 @@ if not es.indices.exists(index=interest_index):
                     "clip_vector": {
                         "type": "elastiknn_dense_float_vector",
                         "elastiknn": {
-                            "dims": 1024,
+                            "dims": DIM,
                             "model": "permutation_lsh",         # 3
                             "k": 400,                            # 4
                             "repeating": True                   # 5

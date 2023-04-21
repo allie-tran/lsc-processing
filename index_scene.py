@@ -17,12 +17,12 @@ scene_dict = json.load(open("files/scene_dict.json"))
 # Set up ElasticSearch
 
 es = Elasticsearch("http://localhost:9200")
-interest_index = "lsc2023_scene_mean"
-# clip_embeddings = joblib.load(
-    # "/mnt/data/nvtu/embedding_features/L14_336_features_128.pkl")
+interest_index = "lsc2023_scene_trans"
 CLIP_EMBEDDINGS = os.environ.get("CLIP_EMBEDDINGS")
 photo_features = np.load(f"{CLIP_EMBEDDINGS}/ViT-H-14_laion2b_s32b_b79k_nonorm/features.npy")
 photo_ids = list(pd.read_csv(f"{CLIP_EMBEDDINGS}/ViT-H-14_laion2b_s32b_b79k_nonorm/photo_ids.csv")["photo_id"])
+
+DIM = photo_features[0].shape[-1]
 clip_embeddings = {photo_id: photo_feature for photo_id, photo_feature in zip(photo_ids, photo_features)}
 photo_features = None
 photo_ids = None
@@ -106,6 +106,8 @@ if not es.indices.exists(index=interest_index):
                     "timestamp": {"type": "long"},
                     "start_seconds_from_midnight": {"type": "long"},
                     "end_seconds_from_midnight": {"type": "long"},
+                    "duration": {"type": "long"},
+                    "group_duration": {"type": "long"},
                     "before": {"type": "keyword"},
                     "after": {"type": "keyword"},
                     "ocr": {"type": "text"},
@@ -115,7 +117,7 @@ if not es.indices.exists(index=interest_index):
                     "clip_vector": {
                         "type": "elastiknn_dense_float_vector",
                         "elastiknn": {
-                            "dims": 1024,
+                            "dims": DIM,
                             "model": "permutation_lsh",         # 3
                             "k": 400,                            # 4
                             "repeating": True                   # 5
@@ -128,13 +130,16 @@ if not es.indices.exists(index=interest_index):
 
 
 
-METHOD = "MEAN"
+METHOD = "TRANS"
 # choose one of ["TRANS_WEIGHTS", "TRANS", "MEAN", "CLUSTERS"]
 if "TRANS" in METHOD:
     from lifelog_qa.multiclip import load_scene_model, SequentialAgg
     import torch
     MODEL_VER = SequentialAgg
-    save_file = "/home/tlduyen/LQA/MultiCLIP/models/SequentialAgg_2.pt"
+    if "WEIGHTS" in METHOD:
+        save_file = "/home/tlduyen/LQA/MultiCLIP/models/SequentialAgg.pt"
+    else:
+        save_file = "/home/tlduyen/LQA/MultiCLIP/models/SequentialAgg_1.pt"
     device = "cuda"
     train_config = {}
     if os.path.exists(save_file):
@@ -181,10 +186,10 @@ def index(items):
                 image_embeddings = torch.tensor(
                     clip_vector).to(device).float()
                 with torch.no_grad():
-                    (scene_embeddings, _), _ = scene_agg.get_scene_embeddings(
+                    (embeddings, _), _ = scene_agg.get_scene_embeddings(
                         image_embeddings, [2], None)
                     scene_embeddings = [
-                        scene_embeddings.squeeze(0).cpu().numpy()]
+                        embeddings.squeeze(0).cpu().numpy()]
                 cluster_images = [desc["images"]]
             else:
                 scene_embeddings = [np.stack(clip_vector).mean(0)]
@@ -215,7 +220,7 @@ def index(items):
             desc["hour"]=int(desc["start_time"][11:13])
             desc["gps"] = []
             desc["weights"] = weights
-
+            print(len(scene_embeddings), len(cluster_images))
             for i, (new_vector, label) in enumerate(zip(scene_embeddings, cluster_images)):
                 num_clusters += 1
                 new_desc = copy.deepcopy(desc)
