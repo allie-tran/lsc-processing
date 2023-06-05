@@ -9,16 +9,16 @@ import numpy as np
 import clip
 from tqdm import tqdm
 import json
+import open_clip
 
 # Load the open CLIP model
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def load_model(name, pretrained):
-    # model, _, preprocess = open_clip.create_model_and_transforms(name, 
-    #                                                              pretrained=pretrained,
-    #                                                              device=device,
-    #                                                              jit=True)
-    model, preprocess = clip.load(name, device=device)
+    model, _, preprocess = open_clip.create_model_and_transforms(name, 
+                                                                 pretrained=pretrained,
+                                                                 device=device)
+    # model, preprocess = clip.load(name, device=device)
     return model, preprocess
 
 def compute_clip_features(photos_batch):
@@ -38,30 +38,45 @@ def compute_clip_features(photos_batch):
     return photos_features.cpu().numpy()
 
 if __name__ == "__main__":
-    # OLD PHOTOS
     # print("Available models", open_clip.list_pretrained())
-    all_images = pd.read_csv('vaisl_gps.csv')["ImageID"].tolist()
-    photofiles2 = []
+    DATASET = 'LSC2020'
+    
+    photofiles = []
     photo_keys = []
-    photos_path = '/mnt/DATA/duyen/highres/LSC23/'
-    model_name = "ViT-L-14-336"
+    model_name = "ViT-L-14"
     pretrained = "openai"
-    output_path = f'/mnt/DATA/duyen/highres/LSC23/{model_name.replace("/", "-")}_{pretrained}_nonorm'
+    # pretrained = "laion2b_s32b_b79k"
     batch_size = 48
+    photos_path = '/mnt/DATA/duyen/highres/LSC23/LSC23_highres_images/'
+    if DATASET == 'LSC2020':
+        all_images = list(json.load(open('LSC2020/fixed_info_dict.json', 'r')).keys())
+        output_path = f'/mnt/DATA/duyen/highres/LSC20/{model_name.replace("/", "-")}_{pretrained}_nonorm'
+    else:
+        all_images = pd.read_csv('vaisl_gps.csv')["ImageID"].tolist()
+        output_path = f'/mnt/DATA/duyen/highres/LSC23/{model_name.replace("/", "-")}_{pretrained}_nonorm'
+    
+    def to_key(image):
+        if DATASET == 'LSC2020':
+            return image
+        else:
+            return f"{image[:6]}/{image[6:8]}/{image}"
     
     print("Looking up photos")
     for image in tqdm(all_images):
         if isinstance(image, str):
-            path = f"{photos_path}/{image[:6]}/{image[6:8]}/{image}"
+            image = to_key(image)
+            path = f"{photos_path}/{image}"
             if os.path.exists(path):
-                photofiles2.append(path)
-                photo_keys.append(f"{image[:6]}/{image[6:8]}/{image}")
+                photofiles.append(path)
+                photo_keys.append(image)
+                
+    print("Found", len(photofiles), "photos")
     print("Loading model", model_name, pretrained)
     model, preprocess = load_model(model_name, pretrained)
 
     features_path = Path(output_path)
     os.system(f"mkdir {output_path}")
-    batches = math.ceil(len(photofiles2) / batch_size)
+    batches = math.ceil(len(photofiles) / batch_size)
     for i in tqdm(range(batches)):
         batch_ids_path = features_path / f"{i:010d}.csv"
         batch_features_path = features_path / f"{i:010d}.npy"
@@ -70,7 +85,7 @@ if __name__ == "__main__":
         if not batch_features_path.exists():
             try:
                 # Select the photos for the current batch
-                batch_files = photofiles2[i*batch_size: (i+1)*batch_size]
+                batch_files = photofiles[i*batch_size: (i+1)*batch_size]
 
                 # Compute the features and save to a numpy file
                 batch_features = compute_clip_features(batch_files)

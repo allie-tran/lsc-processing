@@ -14,13 +14,16 @@ import copy
 from numpy import linalg as LA
 
 scene_dict = json.load(open("files/scene_dict.json"))
+info_dict = json.load(open("files/info_dict.json"))
 # Set up ElasticSearch
 
 es = Elasticsearch("http://localhost:9200")
-interest_index = "lsc2023_scene_trans"
+interest_index = "lsc2023_scene_mean"
 CLIP_EMBEDDINGS = os.environ.get("CLIP_EMBEDDINGS")
-photo_features = np.load(f"{CLIP_EMBEDDINGS}/ViT-H-14_laion2b_s32b_b79k_nonorm/features.npy")
-photo_ids = list(pd.read_csv(f"{CLIP_EMBEDDINGS}/ViT-H-14_laion2b_s32b_b79k_nonorm/photo_ids.csv")["photo_id"])
+model = "ViT-H-14_laion2b_s32b_b79k_nonorm"
+# model = "ViT-L-14-336_openai_nonorm"
+photo_features = np.load(f"{CLIP_EMBEDDINGS}/{model}/features.npy")
+photo_ids = list(pd.read_csv(f"{CLIP_EMBEDDINGS}/{model}/photo_ids.csv")["photo_id"])
 
 DIM = photo_features[0].shape[-1]
 clip_embeddings = {photo_id: photo_feature for photo_id, photo_feature in zip(photo_ids, photo_features)}
@@ -130,7 +133,7 @@ if not es.indices.exists(index=interest_index):
 
 
 
-METHOD = "TRANS"
+METHOD = "MEAN"
 # choose one of ["TRANS_WEIGHTS", "TRANS", "MEAN", "CLUSTERS"]
 if "TRANS" in METHOD:
     from lifelog_qa.multiclip import load_scene_model, SequentialAgg
@@ -221,12 +224,13 @@ def index(items):
             desc["gps"] = []
             desc["weights"] = weights
             print(len(scene_embeddings), len(cluster_images))
-            for i, (new_vector, label) in enumerate(zip(scene_embeddings, cluster_images)):
+            for i, (new_vector, cl_images) in enumerate(zip(scene_embeddings, cluster_images)):
                 num_clusters += 1
                 new_desc = copy.deepcopy(desc)
                 # new_desc['clip_vector'] = new_vector / LA.norm(new_vector, axis=-1, keepdims=True)
                 new_desc['clip_vector'] = new_vector
-                new_desc['cluster_images'] = label
+                new_desc['cluster_images'] = cl_images
+                new_desc['gps'] = [info_dict[image]["gps"] for image in cl_images]
                 if sys.getsizeof(requests) + sys.getsizeof(new_desc) > 15000:
                     try:
                         es.bulk(body=requests)
